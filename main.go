@@ -1,67 +1,101 @@
 package main
 
 import (
-	"fmt"
+	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
+	r := gin.Default()
 
-	hello("Марина") //1
-	hello("Лунтик") //1
-	fmt.Println("---")
+	// Задание 1: Работа с query-параметрами
+	r.GET("/greet", greetHandler)
 
-	fmt.Println(printEven(2, 7))   //2
-	fmt.Println(printEven(0, 36))  //2
-	fmt.Println(printEven(55, 17)) //2
-	fmt.Println("---")
+	// Задание 2: Маршруты для арифметических операций
+	r.GET("/add", func(c *gin.Context) { arithmeticHandler(c, "+") })
+	r.GET("/sub", func(c *gin.Context) { arithmeticHandler(c, "-") })
+	r.GET("/mul", func(c *gin.Context) { arithmeticHandler(c, "*") })
+	r.GET("/div", func(c *gin.Context) { arithmeticHandler(c, "/") })
 
-	fmt.Println(apply(3, 2, "+")) //3
-	fmt.Println(apply(3, 2, "-")) //3
-	fmt.Println(apply(3, 2, "*")) //3
-	fmt.Println(apply(3, 2, "/")) //3
-	fmt.Println(apply(3, 0, "/")) //3
+	// Задание 3: Работа с JSON
+	r.POST("/charcount", charCountHandler)
+
+	// Запуск сервера
+	r.Run(":8080")
 }
 
-func hello(name string) {
-	fmt.Println("Hello, " + name + "!")
-}
+// Обработчик для приветствия
+func greetHandler(c *gin.Context) {
+	name := c.Query("name")
+	age := c.Query("age")
 
-func printEven(num1 int, num2 int) (string, error) {
-	if num1 > num2 {
-		return "0", (fmt.Errorf("ошибка"))
+	if name == "" || age == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name and age are required"})
+		return
 	}
-	var str = ""
-	for i := num1; i <= num2; i++ {
-		var del = i % 2
-		if del == 0 {
-			str = str + " " + strconv.Itoa(i)
-		}
-	}
-	return str, nil
 
+	c.String(http.StatusOK, "Меня зовут %s, мне %s лет", name, age)
 }
 
-func apply(num1 float64, num2 float64, oper string) (float64, error) {
-	if oper == "+" {
-		var res = num1 + num2
-		return res, nil
-	} else if oper == "-" {
-		var res = num1 - num2
-		return res, nil
-	} else if oper == "*" {
-		var res = num1 * num2
-		return res, nil
-	} else if oper == "/" {
-		if num2 != 0 {
-			var res float64 = (num1 / num2)
-			return res, nil
-		}
-		if num2 == 0 {
-			return 0, (fmt.Errorf("ошибка. Деление на ноль невозможно"))
+// Обработчик арифметических операций
+func arithmeticHandler(c *gin.Context, operation string) {
+	a, err1 := strconv.ParseFloat(c.Query("a"), 64)
+	b, err2 := strconv.ParseFloat(c.Query("b"), 64)
 
-		}
+	if err1 != nil || err2 != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Both parameters must be numbers"})
+		return
 	}
-	return 0, (fmt.Errorf("оператор не найден"))
+
+	var result float64
+	switch operation {
+	case "+":
+		result = a + b
+	case "-":
+		result = a - b
+	case "*":
+		result = a * b
+	case "/":
+		if b == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot divide by zero"})
+			return
+		}
+		result = a / b
+	}
+
+	c.JSON(http.StatusOK, gin.H{"result": result})
 }
+
+// Обработчик подсчета символов в строке
+func charCountHandler(c *gin.Context) {
+	var input struct {
+		Text string `json:"text"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+		return
+	}
+
+	// Создаем карту для хранения количества символов
+	charCount := make(map[string]int)
+	for _, char := range input.Text {
+		charCount[string(char)]++
+	}
+
+	c.JSON(http.StatusOK, charCount)
+}
+
+// Пример запроса для charCountHandler:
+// POST http://localhost:8080/charcount
+
+// Примеры запросов для arithmeticHandler:
+// GET http://localhost:8080/add?a=10&b=5       // Сложение
+// GET http://localhost:8080/sub?a=10&b=5       // Вычитание
+// GET http://localhost:8080/mul?a=10&b=5       // Умножение
+// GET http://localhost:8080/div?a=10&b=5       // Деление
+
+// Пример запроса для greetHandler:
+// GET http://localhost:8080/greet?name=Alice&age=19
